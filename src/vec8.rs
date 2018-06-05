@@ -1,4 +1,4 @@
-//! A vector that is indexed by `u32` instead of `usize`.
+//! A vector that is indexed by `u8` instead of `usize`.
 
 // Copyright 2017 Matt Brubeck.  Copyright 2014 The Rust Project Developers. See the COPYRIGHT file
 // at the top-level directory of this distribution and at http://rust-lang.org/COPYRIGHT.
@@ -8,15 +8,15 @@
 // copied, modified, or distributed except according to those terms.
 
 
-use std::{cmp, fmt, iter, mem, ops, ptr, slice, u32, vec};
+use std::{cmp, fmt, iter, mem, ops, ptr, slice, u8, vec};
 use std::ptr::NonNull;
 
-/// A vector that is indexed by `u32` instead of `usize`.
+/// A vector that is indexed by `u8` instead of `usize`.
 ///
-/// On 32-bit platforms, `Vec32<T>` is mostly identical to the standard library `Vec<T>`.
+/// On 32-bit platforms, `Vec8<T>` is mostly identical to the standard library `Vec<T>`.
 ///
-/// On 64-bit platforms, the `Vec32<T>` struct takes up less space than the standard `Vec<T>`
-/// struct (16 bytes instead of 24 bytes), but its maximum capacity is `u32::MAX` instead of
+/// On 64-bit platforms, the `Vec8<T>` struct takes up less space than the standard `Vec<T>`
+/// struct (16 bytes instead of 24 bytes), but its maximum capacity is `u8::MAX` instead of
 /// `usize::MAX`.
 ///
 /// ## Warning
@@ -27,9 +27,9 @@ use std::ptr::NonNull;
 /// ## Examples
 ///
 /// ```
-/// use mediumvec::Vec32;
+/// use mediumvec::Vec8;
 ///
-/// let mut vec = Vec32::new();
+/// let mut vec = Vec8::new();
 /// vec.push(1);
 /// vec.push(2);
 ///
@@ -60,39 +60,40 @@ use std::ptr::NonNull;
 ///     assert_eq!(vec, vec32![0, 0, 0, 0, 0]);
 /// }
 /// ```
-pub struct Vec32<T> {
+#[repr(C, packed)]
+pub struct Vec8<T> {
     ptr: ptr::NonNull<T>,
-    cap: u32,
-    len: u32,
+    cap: u8,
+    len: u8,
 }
 
-unsafe impl<T> Send for Vec32<T> where T: Send + Sized {}
-unsafe impl<T> Sync for Vec32<T> where T: Sync + Sized {}
+unsafe impl<T> Send for Vec8<T> where T: Send + Sized {}
+unsafe impl<T> Sync for Vec8<T> where T: Sync + Sized {}
 
-impl<T> Vec32<T> {
+impl<T> Vec8<T> {
     /// Constructs a new, empty vector.
     ///
     /// The vector will not allocate until elements are pushed onto it.
-    pub fn new() -> Vec32<T> {
-        Vec32 {
+    pub fn new() -> Vec8<T> {
+        Vec8 {
             ptr: NonNull::dangling(),
-            cap: if mem::size_of::<T>() == 0 { u32::MAX } else { 0 },
+            cap: if mem::size_of::<T>() == 0 { u8::MAX } else { 0 },
             len: 0,
         }
     }
 
     /// Constructs a new, empty (length 0) vector with the specified capacity.
-    pub fn with_capacity(cap: u32) -> Vec32<T> {
+    pub fn with_capacity(cap: u8) -> Vec8<T> {
         let mut v = Vec::with_capacity(cap as usize);
         let ptr = NonNull::new(v.as_mut_ptr()).unwrap();
         mem::forget(v);
 
-        Vec32 { ptr, cap, len: 0 }
+        Vec8 { ptr, cap, len: 0 }
     }
 
     /// Append an element to the vector.
     ///
-    /// Panics if the number of elements in the vector overflows `u32`.
+    /// Panics if the number of elements in the vector overflows `u8`.
     pub fn push(&mut self, value: T) {
         if self.len == self.cap {
             self.reserve(1);
@@ -130,7 +131,7 @@ impl<T> Vec32<T> {
     /// assert_eq!(v, [1, 3]);
     /// # }
     /// ```
-    pub fn remove(&mut self, index: u32) -> T {
+    pub fn remove(&mut self, index: u8) -> T {
         let len = self.len;
         assert!(index < len);
         unsafe {
@@ -144,7 +145,7 @@ impl<T> Vec32<T> {
 
     /// Insert an element at position `index`, shifting elements after it to the right.
     ///
-    /// Panics if `index` is out of bounds or the length of the vector overflows `u32`.
+    /// Panics if `index` is out of bounds or the length of the vector overflows `u8`.
     ///
     /// ## Examples
     ///
@@ -158,7 +159,7 @@ impl<T> Vec32<T> {
     /// assert_eq!(vec, [1, 4, 2, 3, 5]);
     /// # }
     /// ```
-    pub fn insert(&mut self, index: u32, element: T) {
+    pub fn insert(&mut self, index: u8, element: T) {
         let len = self.len;
         assert!(index <= len);
         if len == self.cap {
@@ -177,10 +178,10 @@ impl<T> Vec32<T> {
     ///
     /// May reserve more space than requested, to avoid frequent reallocations.
     ///
-    /// Panics if the new capacity overflows `u32`.
+    /// Panics if the new capacity overflows `u8`.
     ///
     /// Re-allocates only if `self.capacity() < self.len() + additional`.
-    pub fn reserve(&mut self, additional: u32) {
+    pub fn reserve(&mut self, additional: u8) {
         let min_cap = self.len.checked_add(additional).expect("capacity overflow");
         if min_cap <= self.cap {
             return
@@ -193,50 +194,50 @@ impl<T> Vec32<T> {
 
     /// Reserves the minimum capacity for `additional` more elements to be inserted.
     ///
-    /// Panics if the new capacity overflows `u32`.
+    /// Panics if the new capacity overflows `u8`.
     ///
     /// Re-allocates only if `self.capacity() < self.len() + additional`.
-    pub fn reserve_exact(&mut self, additional: u32) {
+    pub fn reserve_exact(&mut self, additional: u8) {
         self.as_vec(|v| v.reserve_exact(additional as usize));
     }
 
-    /// Converts a `Vec<T>` to a `Vec32<T>`.
+    /// Converts a `Vec<T>` to a `Vec8<T>`.
     ///
-    /// Panics if the vector's length is greater than `u32::MAX`.
+    /// Panics if the vector's length is greater than `u8::MAX`.
     ///
-    /// Re-allocates only if the vector's capacity is greater than `u32::MAX`.
-    pub fn from_vec(mut vec: Vec<T>) -> Vec32<T> {
+    /// Re-allocates only if the vector's capacity is greater than `u8::MAX`.
+    pub fn from_vec(mut vec: Vec<T>) -> Vec8<T> {
         let len = vec.len();
-        assert!(len <= u32::MAX as usize);
+        assert!(len <= u8::MAX as usize);
 
-        if vec.capacity() > u32::MAX as usize {
+        if vec.capacity() > u8::MAX as usize {
             vec.shrink_to_fit();
         }
 
         let cap = if mem::size_of::<T>() == 0 {
-            u32::MAX
+            u8::MAX
         } else {
-            vec.capacity() as u32
+            vec.capacity() as u8
         };
 
         let ptr = NonNull::new(vec.as_mut_ptr()).unwrap();
         mem::forget(vec);
 
-        Vec32 { ptr, cap, len: len as u32 }
+        Vec8 { ptr, cap, len: len as u8 }
     }
 
-    /// Convert a `Vec32<T>` into a `Vec<T>` without re-allocating.
+    /// Convert a `Vec8<T>` into a `Vec<T>` without re-allocating.
     pub fn into_vec(self) -> Vec<T> {
         unsafe {
             Vec::from_raw_parts(self.ptr.as_ptr(), self.len as usize, self.cap as usize)
         }
     }
 
-    /// Convert a `Vec32<T>` into a `Vec<T>`, mutate it, then convert it back.
+    /// Convert a `Vec8<T>` into a `Vec<T>`, mutate it, then convert it back.
     ///
-    /// This is a convenient way to call `Vec` methods that don't have `Vec32` equivalents.
+    /// This is a convenient way to call `Vec` methods that don't have `Vec8` equivalents.
     ///
-    /// Panics if the vector's length increases to greater than `u32::MAX`.
+    /// Panics if the vector's length increases to greater than `u8::MAX`.
     ///
     /// ```
     /// # #[macro_use] extern crate mediumvec;
@@ -247,13 +248,13 @@ impl<T> Vec32<T> {
     /// # }
     /// ```
     pub fn as_vec<F>(&mut self, f: F) where F: FnOnce(&mut Vec<T>) {
-        let mut vec = mem::replace(self, Vec32::new()).into_vec();
+        let mut vec = mem::replace(self, Vec8::new()).into_vec();
         f(&mut vec);
-        *self = Vec32::from_vec(vec);
+        *self = Vec8::from_vec(vec);
     }
 
     /// Returns the maximum number of elements the vector can hold without reallocating.
-    pub fn capacity(&self) -> u32 {
+    pub fn capacity(&self) -> u8 {
         self.cap
     }
 
@@ -268,7 +269,7 @@ impl<T> Vec32<T> {
     /// Shorten the vector, keeping the first `len` elements and dropping the rest.
     ///
     /// If `len` is greater than the vector's current length, this has no effect.
-    pub fn truncate(&mut self, len: u32) {
+    pub fn truncate(&mut self, len: u8) {
         unsafe {
             // drop any extra elements
             while len < self.len {
@@ -282,7 +283,7 @@ impl<T> Vec32<T> {
     }
 }
 
-/// Initialize a `Vec32`.
+/// Initialize a `Vec8`.
 ///
 /// ## Examples
 ///
@@ -301,17 +302,17 @@ impl<T> Vec32<T> {
 #[macro_export]
 macro_rules! vec32 {
     ($elem:expr; $n:expr) => (
-        $crate::Vec32::from_vec(vec![$elem; $n])
+        $crate::Vec8::from_vec(vec![$elem; $n])
     );
     ($($x:expr),*) => (
-        $crate::Vec32::from_vec(vec![$($x),*])
+        $crate::Vec8::from_vec(vec![$($x),*])
     );
     ($($x:expr,)*) => (vec32![$($x),*])
 }
 
 // Trait implementations:
 
-impl<T> Drop for Vec32<T> {
+impl<T> Drop for Vec8<T> {
     fn drop(&mut self) {
         unsafe {
             ptr::drop_in_place(&mut self[..]);
@@ -320,13 +321,13 @@ impl<T> Drop for Vec32<T> {
     }
 }
 
-impl<T: Clone> Clone for Vec32<T> {
+impl<T: Clone> Clone for Vec8<T> {
     fn clone(&self) -> Self {
-        Vec32::from_vec(self[..].to_vec())
+        Vec8::from_vec(self[..].to_vec())
     }
 }
 
-impl<T> ops::Deref for Vec32<T> {
+impl<T> ops::Deref for Vec8<T> {
     type Target = [T];
 
     fn deref(&self) -> &[T] {
@@ -336,7 +337,7 @@ impl<T> ops::Deref for Vec32<T> {
     }
 }
 
-impl<T> ops::DerefMut for Vec32<T> {
+impl<T> ops::DerefMut for Vec8<T> {
     fn deref_mut(&mut self) -> &mut [T] {
         unsafe {
             slice::from_raw_parts_mut(self.ptr.as_ptr(), self.len as usize)
@@ -344,7 +345,7 @@ impl<T> ops::DerefMut for Vec32<T> {
     }
 }
 
-impl<T> IntoIterator for Vec32<T> {
+impl<T> IntoIterator for Vec8<T> {
     type Item = T;
     type IntoIter = vec::IntoIter<T>;
 
@@ -353,7 +354,7 @@ impl<T> IntoIterator for Vec32<T> {
     }
 }
 
-impl<'a, T> IntoIterator for &'a Vec32<T> {
+impl<'a, T> IntoIterator for &'a Vec8<T> {
     type Item = &'a T;
     type IntoIter = slice::Iter<'a, T>;
 
@@ -362,7 +363,7 @@ impl<'a, T> IntoIterator for &'a Vec32<T> {
     }
 }
 
-impl<'a, T> IntoIterator for &'a mut Vec32<T> {
+impl<'a, T> IntoIterator for &'a mut Vec8<T> {
     type Item = &'a mut T;
     type IntoIter = slice::IterMut<'a, T>;
 
@@ -371,12 +372,12 @@ impl<'a, T> IntoIterator for &'a mut Vec32<T> {
     }
 }
 
-impl<T> Extend<T> for Vec32<T> {
+impl<T> Extend<T> for Vec8<T> {
     fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
         let iterator = iter.into_iter();
         let (lower, _) = iterator.size_hint();
-        assert!(lower < u32::MAX as usize);
-        self.reserve(lower as u32);
+        assert!(lower < u8::MAX as usize);
+        self.reserve(lower as u8);
 
         for i in iterator {
             self.push(i);
@@ -384,13 +385,13 @@ impl<T> Extend<T> for Vec32<T> {
     }
 }
 
-impl<T> iter::FromIterator<T> for Vec32<T> {
-    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Vec32<T> {
+impl<T> iter::FromIterator<T> for Vec8<T> {
+    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Vec8<T> {
         let iterator = iter.into_iter();
         let (lower, _) = iterator.size_hint();
-        assert!(lower < u32::MAX as usize);
+        assert!(lower < u8::MAX as usize);
 
-        let mut v = Vec32::with_capacity(lower as u32);
+        let mut v = Vec8::with_capacity(lower as u8);
         for i in iterator {
             v.push(i);
         }
@@ -398,28 +399,28 @@ impl<T> iter::FromIterator<T> for Vec32<T> {
     }
 }
 
-impl<T: fmt::Debug> fmt::Debug for Vec32<T> {
+impl<T: fmt::Debug> fmt::Debug for Vec8<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Debug::fmt(&self[..], f)
     }
 }
 
-impl<T: PartialOrd> PartialOrd for Vec32<T> {
-    fn partial_cmp(&self, other: &Vec32<T>) -> Option<cmp::Ordering> {
+impl<T: PartialOrd> PartialOrd for Vec8<T> {
+    fn partial_cmp(&self, other: &Vec8<T>) -> Option<cmp::Ordering> {
         PartialOrd::partial_cmp(&**self, &**other)
     }
 }
 
-impl<T: Eq> Eq for Vec32<T> {}
+impl<T: Eq> Eq for Vec8<T> {}
 
-impl<T, U> PartialEq<U> for Vec32<T> where U: for<'a> PartialEq<&'a [T]> {
+impl<T, U> PartialEq<U> for Vec8<T> where U: for<'a> PartialEq<&'a [T]> {
     fn eq(&self, other: &U) -> bool { *other == &self[..] }
     fn ne(&self, other: &U) -> bool { *other != &self[..] }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::Vec32;
+    use super::Vec8;
 
     #[test]
     fn it_works() {
@@ -433,8 +434,8 @@ mod tests {
     fn test_size() {
         use std::mem::size_of;
         #[cfg(target_pointer_width = "64")]
-        assert_eq!(size_of::<Vec32<()>>(), 16);
+        assert_eq!(size_of::<Vec8<()>>(), 16);
         #[cfg(target_pointer_width = "32")]
-        assert_eq!(size_of::<Vec32<()>>(), 12);
+        assert_eq!(size_of::<Vec8<()>>(), 12);
     }
 }
