@@ -112,13 +112,18 @@ where
     fn visit_seq<M>(self, mut access: M) -> Result<Self::Value, M::Error>
     where M: SeqAccess<'de>,
     {
-        let mut vec = Vec8::with_capacity(access.size_hint().unwrap_or(0) as u8);
+        let mut vec = Vec::with_capacity(access.size_hint().unwrap_or(0));
 
         while let Some(value) = access.next_element()? {
             vec.push(value);
         }
 
-        Ok(vec)
+        let mut vec8 = Vec8::with_capacity(vec.len() as u8);
+        for v in vec {
+            vec8.push(v);
+        }
+
+        Ok(vec8)
     }
 }
 
