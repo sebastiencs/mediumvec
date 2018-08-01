@@ -8,6 +8,7 @@
 // copied, modified, or distributed except according to those terms.
 
 
+use std::marker::PhantomData;
 use std::{cmp, fmt, iter, mem, ops, ptr, slice, u8, vec};
 use std::ptr::NonNull;
 
@@ -68,6 +69,7 @@ pub struct Vec8<T> {
 }
 
 use serde::ser::{Serialize, Serializer, SerializeSeq};
+use serde::de::{Deserialize, Deserializer, SeqAccess, Visitor};
 
 impl<T> Serialize for Vec8<T>
 where
@@ -82,6 +84,51 @@ where
             seq.serialize_element(element)?;
         }
         seq.end()
+    }
+}
+
+struct MyVec8Visitor<K> {
+    marker: PhantomData<fn() -> Vec8<K>>
+}
+
+impl<K> MyVec8Visitor<K> {
+    fn new() -> Self {
+        MyVec8Visitor {
+            marker: PhantomData
+        }
+    }
+}
+
+impl<'de, K> Visitor<'de> for MyVec8Visitor<K>
+where
+    K: Deserialize<'de>
+{
+    type Value = Vec8<K>;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("a Vec8")
+    }
+
+    fn visit_seq<M>(self, mut access: M) -> Result<Self::Value, M::Error>
+    where M: SeqAccess<'de>,
+    {
+        let mut vec = Vec8::with_capacity(access.size_hint().unwrap_or(0) as u8);
+
+        while let Some(value) = access.next_element()? {
+            vec.push(value);
+        }
+
+        Ok(vec)
+    }
+}
+
+impl<'de, T> Deserialize<'de> for Vec8<T>
+where
+    T: Deserialize<'de>,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where D: Deserializer<'de> {
+        deserializer.deserialize_seq(MyVec8Visitor::new())
     }
 }
 
@@ -317,16 +364,16 @@ impl<T> Vec8<T> {
 /// assert_eq!(vec, [0, 0, 0, 0, 0]);
 /// # }
 /// ```
-#[macro_export]
-macro_rules! vec32 {
-    ($elem:expr; $n:expr) => (
-        $crate::Vec8::from_vec(vec![$elem; $n])
-    );
-    ($($x:expr),*) => (
-        $crate::Vec8::from_vec(vec![$($x),*])
-    );
-    ($($x:expr,)*) => (vec32![$($x),*])
-}
+// #[macro_export]
+// macro_rules! vec32 {
+//     ($elem:expr; $n:expr) => (
+//         $crate::Vec8::from_vec(vec![$elem; $n])
+//     );
+//     ($($x:expr),*) => (
+//         $crate::Vec8::from_vec(vec![$($x),*])
+//     );
+//     ($($x:expr,)*) => (vec32![$($x),*])
+// }
 
 // Trait implementations:
 
