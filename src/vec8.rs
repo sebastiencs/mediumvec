@@ -67,6 +67,24 @@ pub struct Vec8<T> {
     len: u8,
 }
 
+use serde::ser::{Serialize, Serializer, SerializeSeq};
+
+impl<T> Serialize for Vec8<T>
+where
+    T: Serialize,
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut seq = serializer.serialize_seq(Some(self.len()))?;
+        for element in self {
+            seq.serialize_element(element)?;
+        }
+        seq.end()
+    }
+}
+
 unsafe impl<T> Send for Vec8<T> where T: Send + Sized {}
 unsafe impl<T> Sync for Vec8<T> where T: Sync + Sized {}
 
