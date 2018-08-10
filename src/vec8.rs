@@ -64,7 +64,6 @@ use std::ptr::NonNull;
 #[repr(C, packed)]
 pub struct Vec8<T> {
     ptr: ptr::NonNull<T>,
-    cap: u8,
     len: u8,
 }
 
@@ -147,27 +146,28 @@ impl<T> Vec8<T> {
     pub fn new() -> Vec8<T> {
         Vec8 {
             ptr: NonNull::dangling(),
-            cap: if mem::size_of::<T>() == 0 { u8::MAX } else { 0 },
             len: 0,
         }
     }
 
     /// Constructs a new, empty (length 0) vector with the specified capacity.
     pub fn with_capacity(cap: u8) -> Vec8<T> {
-        let mut v = Vec::with_capacity(cap as usize);
-        let ptr = NonNull::new(v.as_mut_ptr()).unwrap();
-        mem::forget(v);
+        // let mut v = Vec::with_capacity(cap as usize);
+        // let ptr = NonNull::new(v.as_mut_ptr()).unwrap();
+        // mem::forget(v);
 
-        Vec8 { ptr, cap, len: 0 }
+        // Vec8 { ptr, len: cap }
+        Vec8 {
+            ptr: NonNull::dangling(),
+            len: 0,
+        }
     }
 
     /// Append an element to the vector.
     ///
     /// Panics if the number of elements in the vector overflows `u8`.
     pub fn push(&mut self, value: T) {
-        if self.len == self.cap {
-            self.reserve(1);
-        }
+        self.reserve(1);
         unsafe {
             let end = self.as_mut_ptr().offset(self.len as isize);
             ptr::write(end, value);
@@ -232,9 +232,8 @@ impl<T> Vec8<T> {
     pub fn insert(&mut self, index: u8, element: T) {
         let len = self.len;
         assert!(index <= len);
-        if len == self.cap {
-            self.reserve(1);
-        }
+
+        self.reserve(1);
 
         unsafe {
             let p = self.as_mut_ptr().offset(index as isize);
@@ -252,12 +251,9 @@ impl<T> Vec8<T> {
     ///
     /// Re-allocates only if `self.capacity() < self.len() + additional`.
     pub fn reserve(&mut self, additional: u8) {
-        let min_cap = self.len.checked_add(additional).expect("capacity overflow");
-        if min_cap <= self.cap {
-            return
-        }
-        let double_cap = self.cap.saturating_mul(2);
-        let new_cap = cmp::max(min_cap, double_cap);
+        let new_cap = self.len.checked_add(additional).expect("capacity overflow");
+        // let double_cap = self.cap.saturating_mul(2);
+        // let new_cap = cmp::max(min_cap, double_cap);
         let additional = new_cap - self.len;
         self.reserve_exact(additional);
     }
@@ -284,22 +280,16 @@ impl<T> Vec8<T> {
             vec.shrink_to_fit();
         }
 
-        let cap = if mem::size_of::<T>() == 0 {
-            u8::MAX
-        } else {
-            vec.capacity() as u8
-        };
-
         let ptr = NonNull::new(vec.as_mut_ptr()).unwrap();
         mem::forget(vec);
 
-        Vec8 { ptr, cap, len: len as u8 }
+        Vec8 { ptr, len: len as u8 }
     }
 
     /// Convert a `Vec8<T>` into a `Vec<T>` without re-allocating.
     pub fn into_vec(self) -> Vec<T> {
         unsafe {
-            let v = Vec::from_raw_parts(self.ptr.as_ptr(), self.len as usize, self.cap as usize);
+            let v = Vec::from_raw_parts(self.ptr.as_ptr(), self.len as usize, self.len as usize);
             mem::forget(self);
             v
         }
@@ -327,7 +317,7 @@ impl<T> Vec8<T> {
 
     /// Returns the maximum number of elements the vector can hold without reallocating.
     pub fn capacity(&self) -> u8 {
-        self.cap
+        self.len
     }
 
     /// Clears the vector, removing all values.
@@ -388,7 +378,7 @@ impl<T> Drop for Vec8<T> {
     fn drop(&mut self) {
         unsafe {
             ptr::drop_in_place(&mut self[..]);
-            Vec::from_raw_parts(self.ptr.as_ptr(), 0, self.cap as usize);
+            Vec::from_raw_parts(self.ptr.as_ptr(), 0, self.len as usize);
         }
     }
 }
