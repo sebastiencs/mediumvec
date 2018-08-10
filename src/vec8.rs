@@ -299,7 +299,9 @@ impl<T> Vec8<T> {
     /// Convert a `Vec8<T>` into a `Vec<T>` without re-allocating.
     pub fn into_vec(self) -> Vec<T> {
         unsafe {
-            Vec::from_raw_parts(self.ptr.as_ptr(), self.len as usize, self.cap as usize)
+            let v = Vec::from_raw_parts(self.ptr.as_ptr(), self.len as usize, self.cap as usize);
+            mem::forget(self);
+            v
         }
     }
 
